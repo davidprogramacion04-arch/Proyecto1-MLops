@@ -1,0 +1,2 @@
+curl -sS -o /dev/null -w '%{http_code}\n' https://pulso-transmi.72-60-245-2.sslip.io/health
+Comando para hacer pin al endpoint, debe retornar 200, eso significa que esta funcionando, si retorna 400 es que no 

@@ -1,0 +1,94 @@
+┌──────────────────┐
+│      ROUTE       │
+│──────────────────│
+│ PK route_id      │
+│ route_code       │
+│ name             │
+│ route_type       │
+│ active           │
+└────────┬─────────┘
+         │ 1
+         │
+         │ N
+┌────────▼─────────┐
+│    ROUTE_STOP    │
+│──────────────────│
+│ PK route_stop_id │
+│ FK route_id      │
+│ FK stop_id       │
+│ stop_sequence    │
+│ direction        │
+└────────┬─────────┘
+         │ N
+         │
+         │ 1
+┌────────▼─────────┐
+│       STOP       │
+│──────────────────│
+│ PK stop_id       │
+│ code             │
+│ name             │
+│ latitude         │
+│ longitude        │
+│ locality         │
+│ zone             │
+└──────────────────┘
+
+
+┌──────────────────┐
+│     VEHICLE      │
+│──────────────────│
+│ PK vehicle_id    │
+│ vehicle_code     │
+│ vehicle_type     │
+│ capacity         │
+│ operator         │
+│ active           │
+└────────┬─────────┘
+         │ 1
+         │
+         │ N
+┌────────▼────────────┐
+│ VEHICLE_POSITION    │
+│─────────────────────│
+│ PK position_id      │
+│ FK vehicle_id       │
+│ latitude            │
+│ longitude           │
+│ speed               │
+│ heading              │
+│ timestamp           │
+└─────────────────────┘
+
+
+┌──────────────────┐
+│      TRIP        │
+│──────────────────│
+│ PK trip_id       │
+│ FK route_id      │
+│ FK vehicle_id    │
+│ service_date     │
+│ start_time       │
+│ end_time         │
+│ direction        │
+│ status            │
+└────────┬─────────┘
+         │
+         │ 1
+         │
+         │ N
+┌────────▼──────────┐
+│    STOP_EVENT     │
+│───────────────────│
+│ PK event_id       │
+│ FK trip_id        │
+│ FK stop_id        │
+│ arrival_time      │
+│ departure_time    │
+│ dwell_seconds     │
+│ sequence          │
+└───────────────────┘
+
+
+
+

@@ -1,0 +1,28 @@
+{
+  "selected_model": "XGBoost",
+  "selected_params": {
+    "objective": "reg:squarederror",
+    "random_state": 42,
+    "n_jobs": -1,
+    "eval_metric": "rmse",
+    "n_estimators": 500,
+    "max_depth": 5,
+    "learning_rate": 0.05,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0
+  },
+  "test_metrics": {
+    "mae": 47.870330810546875,
+    "rmse": 76.04617352511893,
+    "r2": 0.9458655714988708,
+    "wape": 0.12979063565849241,
+    "accuracy": 87.02093643415077
+  },
+  "val_metrics": {
+    "mae": 46.803321838378906,
+    "rmse": 76.07999105587815,
+    "r2": 0.9411683082580566,
+    "wape": 0.134003191787755,
+    "accuracy": 86.5996808212245
+  }
+}
