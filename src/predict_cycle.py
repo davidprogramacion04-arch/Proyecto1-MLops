@@ -232,26 +232,54 @@ def drift_report(historical: pd.DataFrame, streamed: pd.DataFrame, validation_wa
     }
 
 
-def send_drift_notification(report: dict[str, Any]) -> None:
-    """Envía una alerta vía Webhook (Discord/Slack/Teams) si está configurado."""
-    webhook_url = os.getenv("DRIFT_WEBHOOK_URL")
-    if not webhook_url:
+def send_whatsapp_message(message: str) -> None:
+    """Envía un mensaje de WhatsApp directo a tu celular vía CallMeBot API."""
+    phone = os.getenv("WHATSAPP_PHONE")
+    apikey = os.getenv("WHATSAPP_APIKEY")
+    if not phone or not apikey:
         return
     try:
-        content = (
-            f"🚨 **ALERTA DE DRIFT DETECTADA - Pulso TransMilenio** 🚨\n\n"
-            f"- **Reentrenamiento recomendado:** {report.get('retrain_recommended')}\n"
-            f"- **Max PSI:** {report.get('max_psi')} (Umbral: {PSI_THRESHOLD})\n"
-            f"- **Data Drift:** {report.get('data_drift')}\n"
-            f"- **Performance Drift:** {report.get('performance_drift')}\n"
-            f"- **Rolling WAPE:** {report.get('rolling_wape')}\n"
-            f"- **Detalle PSI:** ```json\n{json.dumps(report.get('psi', {}), indent=2)}\n```"
+        phone_clean = phone.replace("+", "").replace(" ", "").strip()
+        httpx.get(
+            "https://api.callmebot.com/whatsapp.php",
+            params={"phone": phone_clean, "text": message, "apikey": apikey},
+            timeout=10,
         )
-        payload = {"content": content, "text": content}
-        httpx.post(webhook_url, json=payload, timeout=10)
-        print("DRIFT_NOTIFICATION=sent")
+        print("WHATSAPP_NOTIFICATION=sent")
     except Exception as exc:
-        print(f"NOTIFICATION_WARNING: No se pudo enviar webhook: {exc}", file=sys.stderr)
+        print(f"WHATSAPP_WARNING: No se pudo enviar mensaje de WhatsApp: {exc}", file=sys.stderr)
+
+
+def send_drift_notification(report: dict[str, Any]) -> None:
+    """Envía una alerta vía Webhook (Discord/Slack/Teams) y WhatsApp si está configurado."""
+    webhook_url = os.getenv("DRIFT_WEBHOOK_URL")
+    alert_text = (
+        f"🚨 *ALERTA DE DRIFT DETECTADA - Pulso TransMilenio* 🚨\n\n"
+        f"• *Reentrenamiento:* Recomendado\n"
+        f"• *Max PSI:* {report.get('max_psi')} (Umbral: {PSI_THRESHOLD})\n"
+        f"• *Data Drift:* {report.get('data_drift')}\n"
+        f"• *Rolling WAPE:* {report.get('rolling_wape')}\n"
+    )
+    # 1. WhatsApp
+    send_whatsapp_message(alert_text)
+    
+    # 2. Webhook (Discord / Slack)
+    if webhook_url:
+        try:
+            content = (
+                f"🚨 **ALERTA DE DRIFT DETECTADA - Pulso TransMilenio** 🚨\n\n"
+                f"- **Reentrenamiento recomendado:** {report.get('retrain_recommended')}\n"
+                f"- **Max PSI:** {report.get('max_psi')} (Umbral: {PSI_THRESHOLD})\n"
+                f"- **Data Drift:** {report.get('data_drift')}\n"
+                f"- **Performance Drift:** {report.get('performance_drift')}\n"
+                f"- **Rolling WAPE:** {report.get('rolling_wape')}\n"
+                f"- **Detalle PSI:** ```json\n{json.dumps(report.get('psi', {}), indent=2)}\n```"
+            )
+            payload = {"content": content, "text": content}
+            httpx.post(webhook_url, json=payload, timeout=10)
+            print("DRIFT_NOTIFICATION=sent")
+        except Exception as exc:
+            print(f"NOTIFICATION_WARNING: No se pudo enviar webhook: {exc}", file=sys.stderr)
 
 
 def write_github_summary(report: dict[str, Any], cycle: dict[str, Any] | None, submission: dict[str, Any] | None) -> None:
@@ -455,6 +483,16 @@ def main() -> int:
     write_state(records, report)
     print("SUBMISSION=" + json.dumps(response, ensure_ascii=False))
     write_github_summary(report, cycle, response)
+    
+    # Notificación de envío por WhatsApp
+    send_whatsapp_message(
+        f"✅ *Pulso TransMilenio - Predicción Enviada* 🚀\n\n"
+        f"• *Ciclo:* `{cycle.get('cycle_id')}`\n"
+        f"• *Estado:* {response.get('status')}\n"
+        f"• *Predicciones:* {response.get('predictions_received', 48)}/48\n"
+        f"• *Drift:* Normal (PSI: {report.get('max_psi')})\n"
+        f"• *Accuracy Modelo:* {metadata.get('validation_accuracy', 85.06)}%"
+    )
     return 0
 
 
