@@ -232,6 +232,27 @@ def drift_report(historical: pd.DataFrame, streamed: pd.DataFrame, validation_wa
     }
 
 
+def send_ntfy_notification(title: str, message: str, priority: str = "default", tags: str = "bus") -> None:
+    """Envía una notificación push instantánea a tu celular vía ntfy.sh."""
+    topic = os.getenv("NTFY_TOPIC", "pulso_trasmi_DT")
+    try:
+        # Codificación segura para cabeceras HTTP
+        safe_title = title.encode("latin-1", errors="ignore").decode("latin-1") if title else "Pulso TransMi"
+        httpx.post(
+            f"https://ntfy.sh/{topic}",
+            data=message.encode("utf-8"),
+            headers={
+                "Title": safe_title,
+                "Priority": priority,
+                "Tags": tags,
+            },
+            timeout=10,
+        )
+        print(f"NTFY_NOTIFICATION=sent to topic {topic}")
+    except Exception as exc:
+        print(f"NTFY_WARNING: No se pudo enviar notificación ntfy: {exc}", file=sys.stderr)
+
+
 def send_whatsapp_message(message: str) -> None:
     """Envía un mensaje de WhatsApp directo a tu celular vía CallMeBot API."""
     phone = os.getenv("WHATSAPP_PHONE")
@@ -251,19 +272,27 @@ def send_whatsapp_message(message: str) -> None:
 
 
 def send_drift_notification(report: dict[str, Any]) -> None:
-    """Envía una alerta vía Webhook (Discord/Slack/Teams) y WhatsApp si está configurado."""
+    """Envía una alerta vía ntfy.sh, Webhook y WhatsApp si están configurados."""
     webhook_url = os.getenv("DRIFT_WEBHOOK_URL")
     alert_text = (
-        f"🚨 *ALERTA DE DRIFT DETECTADA - Pulso TransMilenio* 🚨\n\n"
-        f"• *Reentrenamiento:* Recomendado\n"
-        f"• *Max PSI:* {report.get('max_psi')} (Umbral: {PSI_THRESHOLD})\n"
-        f"• *Data Drift:* {report.get('data_drift')}\n"
-        f"• *Rolling WAPE:* {report.get('rolling_wape')}\n"
+        f"🚨 ALERTA DE DRIFT DETECTADA - Pulso TransMilenio 🚨\n\n"
+        f"• Reentrenamiento: Recomendado\n"
+        f"• Max PSI: {report.get('max_psi')} (Umbral: {PSI_THRESHOLD})\n"
+        f"• Data Drift: {report.get('data_drift')}\n"
+        f"• Rolling WAPE: {report.get('rolling_wape')}\n"
     )
-    # 1. WhatsApp
+    # 1. ntfy.sh (Push inmediato al celular)
+    send_ntfy_notification(
+        title="Alerta de Drift - Pulso TransMi",
+        message=f"Reentrenamiento recomendado.\nMax PSI: {report.get('max_psi')} (Umbral: {PSI_THRESHOLD})\nRolling WAPE: {report.get('rolling_wape')}",
+        priority="high",
+        tags="warning,rotating_light",
+    )
+    
+    # 2. WhatsApp
     send_whatsapp_message(alert_text)
     
-    # 2. Webhook (Discord / Slack)
+    # 3. Webhook (Discord / Slack)
     if webhook_url:
         try:
             content = (
@@ -461,6 +490,16 @@ def main() -> int:
     if cycle is None:
         print("No hay ciclo abierto: se calculó drift y se sincronizó, pero no se generó submission.")
         write_github_summary(report, None, None)
+        send_ntfy_notification(
+            title="Sin ciclo abierto - Pulso TransMi",
+            message=(
+                f"El pipeline se ejecuto pero no habia ciclo abierto.\n"
+                f"PSI: {report.get('max_psi')} | Drift: {'Si' if report.get('data_drift') else 'No'}\n"
+                f"Stream: {report.get('stream_rows')} filas procesadas."
+            ),
+            priority="low",
+            tags="bus,hourglass_flowing_sand",
+        )
         return 0
         
     observations = combine_observations(historical, streamed)
@@ -475,6 +514,16 @@ def main() -> int:
     if not args.submit:
         print("Dry-run completado. Usa --submit únicamente después de revisar PREDICTIONS.")
         write_github_summary(report, cycle, {"status": "dry-run"})
+        send_ntfy_notification(
+            title="Dry-run completado - Pulso TransMi",
+            message=(
+                f"Ciclo: {cycle.get('cycle_id')}\n"
+                f"{len(records)} predicciones generadas (no enviadas).\n"
+                f"Usa --submit para enviar al ciclo oficial."
+            ),
+            priority="min",
+            tags="bus,eyes",
+        )
         return 0
         
     response = submit(cycle, records, metadata)
@@ -484,7 +533,18 @@ def main() -> int:
     print("SUBMISSION=" + json.dumps(response, ensure_ascii=False))
     write_github_summary(report, cycle, response)
     
-    # Notificación de envío por WhatsApp
+    # Notificaciones de envío (ntfy.sh + WhatsApp)
+    send_ntfy_notification(
+        title="Prediccion Enviada - Pulso TransMi",
+        message=(
+            f"Ciclo: {cycle.get('cycle_id')}\n"
+            f"Estado: {response.get('status')} (48/48)\n"
+            f"PSI: {report.get('max_psi')} (Drift: {'Si' if report.get('data_drift') else 'No'})\n"
+            f"Accuracy Modelo: {metadata.get('validation_accuracy', 85.06)}%"
+        ),
+        priority="default",
+        tags="bus,rocket,white_check_mark",
+    )
     send_whatsapp_message(
         f"✅ *Pulso TransMilenio - Predicción Enviada* 🚀\n\n"
         f"• *Ciclo:* `{cycle.get('cycle_id')}`\n"
@@ -500,5 +560,17 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as error:
+        # Notificación de error crítico vía ntfy
+        try:
+            import httpx as _httpx
+            topic = os.getenv("NTFY_TOPIC", "pulso_trasmi_DT")
+            _httpx.post(
+                f"https://ntfy.sh/{topic}",
+                data=f"Error critico en el pipeline:\n{error}".encode("utf-8"),
+                headers={"Title": "ERROR Pipeline - Pulso TransMi", "Priority": "urgent", "Tags": "warning,x"},
+                timeout=10,
+            )
+        except Exception:
+            pass
         print(f"ERROR: {error}", file=sys.stderr)
         raise SystemExit(1)
