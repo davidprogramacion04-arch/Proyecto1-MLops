@@ -67,13 +67,15 @@ jobs:
         with:
           script: |
             const maxPsi = '${{ steps.run_pipeline.outputs.max_psi }}';
+            const owner = context.repo.owner;
             const issueTitle = `🚨 Alerta de Drift: Reentrenamiento recomendado (PSI: ${maxPsi})`;
-            const issueBody = `Se ha detectado **Drift** en el flujo de datos de Pulso TransMilenio.\n\n` +
-              `- **Max PSI alcanzado:** ${maxPsi} (Umbral de alerta: 0.20)\n` +
-              `- **Ejecución de Workflow:** [Ver log del Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n` +
-              `Por favor revisar los datos recientes e iniciar el pipeline de reentrenamiento del modelo.`;
+            const issueBody = `@${owner} Se ha detectado **Drift** significativo en el flujo de datos de Pulso TransMilenio.\n\n` +
+              `### 📊 Métricas del Drift:\n` +
+              `- **Max PSI alcanzado:** \`${maxPsi}\` (Umbral de alerta: \`0.20\`)\n` +
+              `- **Ejecución de Workflow:** [Ver log completo en GitHub Actions](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n` +
+              `> 💡 **Acción requerida:** Reentrenar el modelo incorporando los datos acumulados en el stream para recuperar accuracy.`;
             
-            // Buscar si ya existe un issue abierto con la etiqueta drift-alert para no duplicar
+            // Buscar si ya existe un issue abierto con la etiqueta drift-alert para evitar spam
             const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -87,9 +89,10 @@ jobs:
                 repo: context.repo.repo,
                 title: issueTitle,
                 body: issueBody,
+                assignees: [owner],
                 labels: ['drift-alert']
               });
-              console.log('Issue de alerta de drift creado exitosamente.');
+              console.log(`Issue de alerta de drift creado y asignado a @${owner}.`);
             } else {
               console.log('Ya existe un issue de drift abierto; no se duplicará.');
             }

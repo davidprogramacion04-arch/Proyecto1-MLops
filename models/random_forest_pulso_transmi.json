@@ -1,1 +1,19 @@
-{"selected_model": "RandomForest", "test_metrics": {"accuracy": 87.17}}
+{
+  "model_name": "random_forest_pulso_transmi",
+  "trained_at": "2026-09-25T19:43:13.650833+00:00",
+  "training_data_end": "2026-09-13T09:00:00+00:00",
+  "training_samples": 56364,
+  "params": {
+    "n_estimators": 120,
+    "max_depth": 14,
+    "min_samples_leaf": 2,
+    "max_features": 0.8,
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "validation_wape": 0.1494,
+  "validation_accuracy": 85.06,
+  "validation_r2": 0.9234,
+  "validation_rmse": 72.15,
+  "validation_mae": 44.9
+}
