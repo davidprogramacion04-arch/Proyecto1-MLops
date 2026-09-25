@@ -2,8 +2,8 @@ name: Hourly Forecast & Drift Pipeline
 
 on:
   schedule:
-    # Se ejecuta cada hora al minuto 0
-    - cron: '0 * * * *'
+    # Se ejecuta cada hora al minuto 40 (ej: 1:40, 2:40, 3:40, etc.)
+    - cron: '40 * * * *'
   workflow_dispatch:
     inputs:
       submit:
